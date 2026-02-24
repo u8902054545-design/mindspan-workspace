@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { auth, db } from './firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { ref, onValue, set, serverTimestamp } from 'firebase/database';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { ref, onValue, set } from 'firebase/database';
 import { Home, CalendarRange, FolderOpen, CreditCard, GraduationCap, MessageSquareMore } from 'lucide-react';
 import Login from './components/Login';
 import Navigation from './components/Navigation';
@@ -23,25 +23,26 @@ const App = () => {
   ];
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         const encodedEmail = currentUser.email.replace(/\./g, ',');
-        const userRef = ref(db, `whitelist/${encodedEmail}`);
+        const sessionRef = ref(db, `whitelist/${encodedEmail}/currentToken`);
         
-        onValue(userRef, (snapshot) => {
-          const data = snapshot.val();
-          if (data && data.status === 'active') {
-            setUser(currentUser);
-            // ФИКС ТОКЕНА: Обновляем статус и время входа в БД
-            set(ref(db, `users/${encodedEmail}/session`), {
-              lastLogin: serverTimestamp(),
-              status: 'active',
-              deviceId: navigator.userAgent
-            });
+        // Слушаем токен в реальном времени
+        onValue(sessionRef, (snapshot) => {
+          const remoteToken = snapshot.val();
+          const localToken = localStorage.getItem('session_token');
+
+          // Если токена в базе нет (удален) или он не совпадает — выход
+          if (!remoteToken || remoteToken === 'revoked' || (localToken && remoteToken !== localToken)) {
+            localStorage.removeItem('session_token');
+            signOut(auth);
+            setUser(null);
+            setLoading(false);
           } else {
-            auth.signOut();
+            setUser(currentUser);
+            setLoading(false);
           }
-          setLoading(false);
         });
       } else {
         setUser(null);
@@ -68,28 +69,24 @@ const App = () => {
       <style>{`
         .sections-container {
           display: flex;
-          width: 600%; /* 6 вкладок по 100% */
+          width: 600%;
           height: calc(100% - 80px);
-          transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+          transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
           will-change: transform;
           transform: translate3d(-${currentIndex * (100 / 6)}%, 0, 0);
         }
-        .section-page {
-          width: 16.666%; /* 1/6 от контейнера */
-          height: 100%;
-          flex-shrink: 0;
-        }
+        .section-page { width: 16.666%; height: 100%; flex-shrink: 0; }
       `}</style>
 
       <div className="sections-container">
         {navItems.map((item, idx) => (
           <div key={item.id} className="section-page">
             {loadedSections[idx] && (
-              <div className="w-full h-full flex flex-col items-center justify-center">
+              <div className="w-full h-full flex items-center justify-center">
                 {idx === 0 ? (
-                   <div className="text-center animate-in fade-in zoom-in duration-700">
-                     <h1 className="text-3xl font-bold text-white">Привет, {user.displayName}!</h1>
-                     <p className="text-gray-400 mt-2">Сессия активна</p>
+                   <div className="text-center">
+                     <h1 className="text-3xl font-bold text-white">MindSpan</h1>
+                     <p className="text-blue-400 mt-2">Сессия активна</p>
                    </div>
                 ) : <NotFound />}
               </div>
