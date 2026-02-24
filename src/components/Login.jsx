@@ -1,35 +1,29 @@
 import React, { useState } from 'react';
 import { auth, db } from '../firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { ref, get } from 'firebase/database';
-import { LogIn } from 'lucide-react';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleGoogleLogin = async () => {
     setLoading(true);
     setError('');
+    const provider = new GoogleAuthProvider();
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
       const encodedEmail = user.email.replace(/\./g, ',');
       
       const snapshot = await get(ref(db, `whitelist/${encodedEmail}`));
       const data = snapshot.val();
 
       if (data && data.status === 'active') {
-        const token = Math.random().toString(36).substring(2);
-        localStorage.setItem('ms_token', token);
-        // В SPA мы просто сменим состояние в App.jsx, но пока логика такая
-        window.location.reload(); 
+        // Успешный вход, App.jsx сам увидит смену состояния
       } else {
-        setError('Доступ запрещен или аккаунт не активен');
+        setError('Вашего email нет в белом списке');
         await auth.signOut();
       }
     } catch (err) {
@@ -41,51 +35,30 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#05050a] px-4">
-      <div className="w-full max-w-md backdrop-blur-xl bg-white/[0.02] border border-white/[0.05] rounded-[32px] p-8 shadow-2xl">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">MindSpan</h1>
-          <p className="text-gray-400">Войдите в рабочее пространство</p>
-        </div>
+      <div className="w-full max-w-md backdrop-blur-xl bg-white/[0.02] border border-white/[0.05] rounded-[32px] p-10 text-center shadow-2xl">
+        <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">MindSpan</h1>
+        <p className="text-gray-400 mb-10">Войдите через рабочий аккаунт Google</p>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <input
-              type="email"
-              placeholder="Email"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm">
+            {error}
           </div>
-          <div>
-            <input
-              type="password"
-              placeholder="Пароль"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
+        )}
 
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#0000FF] hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all active:scale-95 flex items-center justify-center"
-          >
-            {loading ? (
-              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-              <>
-                <LogIn className="mr-2 w-5 h-5" />
-                Войти
-              </>
-            )}
-          </button>
-        </form>
+        <button
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          className="w-full group relative flex items-center justify-center gap-3 bg-white text-black font-semibold py-4 rounded-2xl transition-all active:scale-95 hover:bg-gray-100 disabled:opacity-50"
+        >
+          {loading ? (
+            <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+          ) : (
+            <>
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" alt="G" className="w-5 h-5" />
+              Войти через Google
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
