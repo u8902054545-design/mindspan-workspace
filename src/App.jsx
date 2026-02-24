@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { auth, db } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, set, serverTimestamp } from 'firebase/database';
 import { Home, CalendarRange, FolderOpen, CreditCard, GraduationCap, MessageSquareMore } from 'lucide-react';
 import Login from './components/Login';
 import Navigation from './components/Navigation';
@@ -10,7 +10,6 @@ import NotFound from './pages/NotFound';
 const App = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isWhitelisted, setIsWhitelisted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loadedSections, setLoadedSections] = useState({ 0: true });
 
@@ -27,11 +26,18 @@ const App = () => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         const encodedEmail = currentUser.email.replace(/\./g, ',');
-        onValue(ref(db, `whitelist/${encodedEmail}`), (snapshot) => {
+        const userRef = ref(db, `whitelist/${encodedEmail}`);
+        
+        onValue(userRef, (snapshot) => {
           const data = snapshot.val();
           if (data && data.status === 'active') {
             setUser(currentUser);
-            setIsWhitelisted(true);
+            // ФИКС ТОКЕНА: Обновляем статус и время входа в БД
+            set(ref(db, `users/${encodedEmail}/session`), {
+              lastLogin: serverTimestamp(),
+              status: 'authorized',
+              deviceId: navigator.userAgent
+            });
           } else {
             auth.signOut();
           }
@@ -54,31 +60,37 @@ const App = () => {
     setCurrentIndex(targetIndex);
   }, [currentIndex, loadedSections]);
 
-  if (loading) return null; // Или твой спиннер
-
+  if (loading) return null;
   if (!user) return <Login />;
 
   return (
-    <div className="relative w-full h-screen bg-[#0F0F0F] overflow-hidden select-none">
+    <div className="fixed inset-0 w-screen h-screen bg-[#08070b] overflow-hidden select-none">
       <style>{`
-        .sections-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: calc(100% - 80px); overflow: hidden; z-index: 10; }
-        .section { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); will-change: transform; }
+        .sections-container {
+          display: flex;
+          width: 600%; /* 6 вкладок по 100% */
+          height: calc(100% - 80px);
+          transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+          will-change: transform;
+          transform: translate3d(-${currentIndex * (100 / 6)}%, 0, 0);
+        }
+        .section-page {
+          width: 16.666%; /* 1/6 от контейнера */
+          height: 100%;
+          flex-shrink: 0;
+        }
       `}</style>
 
-      <div className="sections-wrapper">
+      <div className="sections-container">
         {navItems.map((item, idx) => (
-          <div 
-            key={item.id} 
-            className="section" 
-            style={{ transform: `translateX(${(idx - currentIndex) * 100}%)` }}
-          >
+          <div key={item.id} className="section-page">
             {loadedSections[idx] && (
-              <div className="w-full h-full flex items-center justify-center p-6 text-center">
+              <div className="w-full h-full flex flex-col items-center justify-center">
                 {idx === 0 ? (
-                  <div>
-                    <h1 className="text-3xl font-bold mb-4">Привет, {user.displayName}!</h1>
-                    <p className="text-gray-400">Это твой новый React Workspace.</p>
-                  </div>
+                   <div className="text-center animate-in fade-in zoom-in duration-700">
+                     <h1 className="text-3xl font-bold text-white">Привет, {user.displayName}!</h1>
+                     <p className="text-gray-400 mt-2">Сессия активна</p>
+                   </div>
                 ) : <NotFound />}
               </div>
             )}
