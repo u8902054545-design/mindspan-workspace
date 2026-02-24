@@ -29,34 +29,22 @@ const App = () => {
         setLoading(false);
         return;
       }
-
       const encodedEmail = currentUser.email.replace(/\./g, ',');
       const sessionRef = ref(db, `whitelist/${encodedEmail}/currentToken`);
-      
-      // Используем onValue для слежения за токеном
       const unsubscribeSession = onValue(sessionRef, (snapshot) => {
         const remoteToken = snapshot.val();
         const localToken = localStorage.getItem('session_token');
-
-        // КРИТИЧЕСКИЙ ФИКС: 
-        // Если в базе 'revoked' ИЛИ (токен уже есть в базе И он не равен нашему)
         if (remoteToken === 'revoked' || (remoteToken && localToken && remoteToken !== localToken)) {
-          console.log("Session invalidated remotely");
           localStorage.removeItem('session_token');
           signOut(auth);
           setUser(null);
         } else if (remoteToken && remoteToken === localToken) {
-          // Пускаем только если токены совпали
           setUser(currentUser);
         }
-        
-        // Снимаем экран загрузки только когда получили хоть какой-то ответ от БД
         setLoading(false);
       });
-
       return () => unsubscribeSession();
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -75,36 +63,73 @@ const App = () => {
     </div>
   );
 
-  if (!user) return <Login />;
-
   return (
-    <div className="fixed inset-0 w-screen h-screen bg-[#08070b] overflow-hidden select-none">
+    <div className="fixed inset-0 w-screen h-screen bg-[#08070b] overflow-hidden select-none text-[#E6E1E5]">
       <style>{`
-        .sections-container {
-          display: flex; width: 600%; height: calc(100% - 80px);
+        /* Слайдер между Логином и Контентом */
+        .auth-slider {
+          display: flex;
+          width: 200vw;
+          height: 100vh;
+          transition: transform 0.8s cubic-bezier(0.77, 0, 0.175, 1);
+          will-change: transform;
+        }
+        .auth-page { width: 100vw; height: 100vh; flex-shrink: 0; position: relative; }
+        
+        /* Внутренний слайдер разделов (Workspace) */
+        .workspace-container {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+        }
+        .sections-viewport {
+          flex: 1;
+          overflow: hidden;
+          position: relative;
+        }
+        .sections-wrapper {
+          display: flex;
+          width: 600%;
+          height: 100%;
           transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
           will-change: transform;
-          transform: translate3d(-${currentIndex * (100 / 6)}%, 0, 0);
         }
         .section-page { width: 16.666%; height: 100%; flex-shrink: 0; }
       `}</style>
-      <div className="sections-container">
-        {navItems.map((item, idx) => (
-          <div key={item.id} className="section-page">
-            {loadedSections[idx] && (
-              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-white">
-                {idx === 0 ? (
-                   <div className="text-center animate-in fade-in zoom-in duration-500">
-                     <h1 className="text-3xl font-bold mb-2">WorkSpace</h1>
-                     <p className="text-[#A594FD] opacity-80">Активная сессия: {user.displayName}</p>
-                   </div>
-                ) : <NotFound />}
+
+      <div className="auth-slider" style={{ transform: `translate3d(${user ? '-100vw' : '0'}, 0, 0)` }}>
+        {/* СТРАНИЦА 1: ЛОГИН */}
+        <div className="auth-page">
+          <Login />
+        </div>
+
+        {/* СТРАНИЦА 2: WORKSPACE */}
+        <div className="auth-page">
+          <div className="workspace-container">
+            <div className="sections-viewport">
+              <div className="sections-wrapper" style={{ transform: `translate3d(-${currentIndex * (100 / 6)}%, 0, 0)` }}>
+                {navItems.map((item, idx) => (
+                  <div key={item.id} className="section-page">
+                    {loadedSections[idx] && (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-6">
+                        {idx === 0 ? (
+                           <div className="text-center">
+                             <h1 className="text-4xl font-semibold mindspan-title tracking-tight mb-2">MindSpan</h1>
+                             <p className="text-[#A594FD] opacity-80 uppercase tracking-widest text-xs">WorkSpace Active</p>
+                           </div>
+                        ) : <NotFound />}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+            {user && <Navigation navItems={navItems} currentIndex={currentIndex} handleNavClick={handleNavClick} />}
           </div>
-        ))}
+        </div>
       </div>
-      <Navigation navItems={navItems} currentIndex={currentIndex} handleNavClick={handleNavClick} />
     </div>
   );
 };
