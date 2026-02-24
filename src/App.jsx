@@ -3,12 +3,14 @@ import { auth, db } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { ref, onValue } from 'firebase/database';
 import Login from './components/Login';
+import Navigation from './components/Navigation';
 import NotFound from './pages/NotFound';
 
 const App = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isWhitelisted, setIsWhitelisted] = useState(false);
+  const [activeTab, setActiveTab] = useState('main');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -46,10 +48,22 @@ const App = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#05050a]">
+    <div className="min-h-screen bg-[#05050a] text-white pb-24">
       {user && isWhitelisted ? (
-        /* Сюда мы позже добавим полноценную навигацию */
-        <NotFound /> 
+        <>
+          <main className="p-4">
+            {/* Здесь мы будем переключать компоненты страниц */}
+            {activeTab === 'main' && (
+              <div className="pt-10 text-center">
+                <h2 className="text-2xl font-bold">Добро пожаловать, {user.displayName}!</h2>
+                <p className="text-gray-400 mt-2">Ваша главная панель управления</p>
+              </div>
+            )}
+            {activeTab !== 'main' && <NotFound />}
+          </main>
+          
+          <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+        </>
       ) : (
         <Login />
       )}
