@@ -35,7 +35,7 @@ const App = () => {
             // ФИКС ТОКЕНА: Обновляем статус и время входа в БД
             set(ref(db, `users/${encodedEmail}/session`), {
               lastLogin: serverTimestamp(),
-              status: 'authorized',
+              status: 'active',
               deviceId: navigator.userAgent
             });
           } else {
