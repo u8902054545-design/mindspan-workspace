@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { ref, onValue } from 'firebase/database';
-import { Home, CalendarRange, FolderOpen, CreditCard, GraduationCap, MessageSquareMore } from 'lucide-react';
+import { Home, CalendarRange, FolderOpen, CreditCard, GraduationCap, MessageSquareMore } from 'lucide-round';
 import Login from './components/Login';
 import Navigation from './components/Navigation';
 import NotFound from './pages/NotFound';
@@ -12,15 +12,6 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loadedSections, setLoadedSections] = useState({ 0: true });
-
-  const navItems = [
-    { id: 0, label: 'Главный', icon: Home },
-    { id: 1, label: 'Слоты', icon: CalendarRange },
-    { id: 2, label: 'Файлы', icon: FolderOpen },
-    { id: 3, label: 'Выплаты', icon: CreditCard },
-    { id: 4, label: 'Обучение', icon: GraduationCap },
-    { id: 5, label: 'Чаты', icon: MessageSquareMore },
-  ];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -63,61 +54,65 @@ const App = () => {
     </div>
   );
 
+  const navItems = [
+    { id: 0, label: 'Главный', icon: Home },
+    { id: 1, label: 'Слоты', icon: CalendarRange },
+    { id: 2, label: 'Файлы', icon: FolderOpen },
+    { id: 3, label: 'Выплаты', icon: CreditCard },
+    { id: 4, label: 'Обучение', icon: GraduationCap },
+    { id: 5, label: 'Чаты', icon: MessageSquareMore },
+  ];
+
   return (
-    <div className="fixed inset-0 w-screen h-screen bg-[#08070b] overflow-hidden select-none text-[#E6E1E5]">
+    <div className="fixed inset-0 w-full h-full bg-[#08070b] overflow-hidden select-none">
       <style>{`
-        /* Слайдер между Логином и Контентом */
-        .auth-slider {
-          display: flex;
-          width: 200vw;
-          height: 100vh;
-          transition: transform 0.8s cubic-bezier(0.77, 0, 0.175, 1);
+        .main-stage {
+          position: absolute;
+          top: 0; left: 0;
+          width: 100%; height: 100%;
+          transition: transform 0.8s cubic-bezier(0.7, 0, 0.3, 1);
           will-change: transform;
         }
-        .auth-page { width: 100vw; height: 100vh; flex-shrink: 0; position: relative; }
-        
-        /* Внутренний слайдер разделов (Workspace) */
-        .workspace-container {
-          position: relative;
-          width: 100%;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
+        .workspace-view {
+          position: absolute;
+          top: 0; left: 100%; /* Изначально за правым краем */
+          width: 100%; height: 100%;
         }
-        .sections-viewport {
-          flex: 1;
-          overflow: hidden;
-          position: relative;
+        .login-view {
+          position: absolute;
+          top: 0; left: 0;
+          width: 100%; height: 100%;
         }
         .sections-wrapper {
           display: flex;
-          width: 600%;
-          height: 100%;
-          transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+          width: 600%; height: calc(100% - 80px);
+          transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
           will-change: transform;
         }
         .section-page { width: 16.666%; height: 100%; flex-shrink: 0; }
       `}</style>
 
-      <div className="auth-slider" style={{ transform: `translate3d(${user ? '-100vw' : '0'}, 0, 0)` }}>
-        {/* СТРАНИЦА 1: ЛОГИН */}
-        <div className="auth-page">
+      {/* Главная сцена: сдвигается на -100% когда юзер вошел */}
+      <div className="main-stage" style={{ transform: `translate3d(${user ? '-100%' : '0'}, 0, 0)` }}>
+        
+        {/* Вид логина */}
+        <div className="login-view">
           <Login />
         </div>
 
-        {/* СТРАНИЦА 2: WORKSPACE */}
-        <div className="auth-page">
-          <div className="workspace-container">
-            <div className="sections-viewport">
+        {/* Вид рабочего пространства */}
+        <div className="workspace-view">
+          <div className="w-full h-full flex flex-col">
+            <div className="flex-1 overflow-hidden relative">
               <div className="sections-wrapper" style={{ transform: `translate3d(-${currentIndex * (100 / 6)}%, 0, 0)` }}>
                 {navItems.map((item, idx) => (
                   <div key={item.id} className="section-page">
                     {loadedSections[idx] && (
-                      <div className="w-full h-full flex flex-col items-center justify-center p-6">
+                      <div className="w-full h-full flex items-center justify-center p-6">
                         {idx === 0 ? (
                            <div className="text-center">
                              <h1 className="text-4xl font-semibold mindspan-title tracking-tight mb-2">MindSpan</h1>
-                             <p className="text-[#A594FD] opacity-80 uppercase tracking-widest text-xs">WorkSpace Active</p>
+                             <p className="text-[#A594FD] opacity-80 uppercase tracking-widest text-[10px]">WorkSpace Active</p>
                            </div>
                         ) : <NotFound />}
                       </div>
@@ -129,6 +124,7 @@ const App = () => {
             {user && <Navigation navItems={navItems} currentIndex={currentIndex} handleNavClick={handleNavClick} />}
           </div>
         </div>
+
       </div>
     </div>
   );
