@@ -1,34 +1,79 @@
 import React from 'react';
-import { Home, LayoutGrid, FolderOpen, CreditCard, GraduationCap, MessageSquare } from 'lucide-react';
 
-const Navigation = ({ activeTab, setActiveTab }) => {
-  const menuItems = [
-    { id: 'main', icon: Home, label: 'Главный' },
-    { id: 'slots', icon: LayoutGrid, label: 'Слоты' },
-    { id: 'files', icon: FolderOpen, label: 'Файлы' },
-    { id: 'payments', icon: CreditCard, label: 'Выплаты' },
-    { id: 'education', icon: GraduationCap, label: 'Обучение' },
-    { id: 'chats', icon: MessageSquare, label: 'Чаты' },
-  ];
-
+const Navigation = ({ navItems, currentIndex, handleNavClick }) => {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-6 pt-2 bg-[#05050a]/80 backdrop-blur-lg border-t border-white/5">
-      <div className="max-w-lg mx-auto flex justify-between items-center">
-        {menuItems.map((item) => {
+    <nav className="nav-bar fixed bottom-0 left-0 w-full z-50">
+      <style>{`
+        .nav-bar {
+          background-color: #1F1F1F;
+          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6); 
+          height: 80px;
+          padding-bottom: env(safe-area-inset-bottom);
+        }
+        .nav-item {
+          position: relative;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          background: transparent;
+          border: none;
+          outline: none;
+          -webkit-tap-highlight-color: transparent; 
+        }
+        .icon-container {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 64px;
+          height: 32px;
+          border-radius: 16px;
+          transition: background-color 0.3s cubic-bezier(0.2, 0.0, 0, 1.0), transform 0.1s ease;
+          margin-bottom: 4px;
+        }
+        .nav-label {
+          font-size: 11px;
+          font-weight: 600;
+          color: #C4C7C5;
+          transition: color 0.2s;
+          letter-spacing: 0.3px;
+        }
+        .nav-item svg {
+          color: #C4C7C5; 
+          transition: color 0.2s;
+          width: 24px;
+          height: 24px;
+        }
+        .nav-item.active .icon-container {
+          background-color: #0000FF; 
+        }
+        .nav-item.active svg {
+          color: #FFFFFF;
+        }
+        .nav-item.active .nav-label {
+          color: #FFFFFF;
+        }
+        .nav-item:active .icon-container {
+          transform: scale(0.95);
+        }
+      `}</style>
+      <div className="flex justify-between items-center h-full max-w-lg mx-auto px-2">
+        {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeTab === item.id;
+          const isActive = currentIndex === item.id;
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className="flex flex-col items-center justify-center transition-all duration-300 relative group"
+              className={`nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => handleNavClick(item.id)}
             >
-              <div className={`p-2 rounded-2xl transition-all duration-300 ${isActive ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]' : 'text-gray-500 hover:text-gray-300'}`}>
-                <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
+              <div className="icon-container">
+                <Icon />
               </div>
-              <span className={`text-[10px] mt-1 font-medium transition-all ${isActive ? 'text-white opacity-100' : 'text-gray-500 opacity-0 group-hover:opacity-100'}`}>
-                {item.label}
-              </span>
+              <span className="nav-label">{item.label}</span>
             </button>
           );
         })}
