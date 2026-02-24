@@ -24,30 +24,39 @@ const App = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        const encodedEmail = currentUser.email.replace(/\./g, ',');
-        const sessionRef = ref(db, `whitelist/${encodedEmail}/currentToken`);
-        
-        onValue(sessionRef, (snapshot) => {
-          const remoteToken = snapshot.val();
-          const localToken = localStorage.getItem('session_token');
-
-          // Если токен в базе "revoked" или он явно не совпадает с локальным
-          if (remoteToken === 'revoked' || (remoteToken && localToken && remoteToken !== localToken)) {
-            localStorage.removeItem('session_token');
-            signOut(auth);
-            setUser(null);
-          } else if (remoteToken) {
-            // Если токен есть и он совпадает (или локального еще нет)
-            setUser(currentUser);
-          }
-          setLoading(false);
-        });
-      } else {
+      if (!currentUser) {
         setUser(null);
         setLoading(false);
+        return;
       }
+
+      const encodedEmail = currentUser.email.replace(/\./g, ',');
+      const sessionRef = ref(db, `whitelist/${encodedEmail}/currentToken`);
+      
+      // Используем onValue для слежения за токеном
+      const unsubscribeSession = onValue(sessionRef, (snapshot) => {
+        const remoteToken = snapshot.val();
+        const localToken = localStorage.getItem('session_token');
+
+        // КРИТИЧЕСКИЙ ФИКС: 
+        // Если в базе 'revoked' ИЛИ (токен уже есть в базе И он не равен нашему)
+        if (remoteToken === 'revoked' || (remoteToken && localToken && remoteToken !== localToken)) {
+          console.log("Session invalidated remotely");
+          localStorage.removeItem('session_token');
+          signOut(auth);
+          setUser(null);
+        } else if (remoteToken && remoteToken === localToken) {
+          // Пускаем только если токены совпали
+          setUser(currentUser);
+        }
+        
+        // Снимаем экран загрузки только когда получили хоть какой-то ответ от БД
+        setLoading(false);
+      });
+
+      return () => unsubscribeSession();
     });
+
     return () => unsubscribe();
   }, []);
 
@@ -61,8 +70,8 @@ const App = () => {
   }, [currentIndex, loadedSections]);
 
   if (loading) return (
-    <div className="fixed inset-0 bg-[#08070b] flex items-center justify-center">
-       <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+    <div className="fixed inset-0 bg-[#08070b] flex items-center justify-center z-[10001]">
+       <div className="w-10 h-10 border-2 border-[#A594FD] border-t-transparent rounded-full animate-spin"></div>
     </div>
   );
 
@@ -83,13 +92,11 @@ const App = () => {
         {navItems.map((item, idx) => (
           <div key={item.id} className="section-page">
             {loadedSections[idx] && (
-              <div className="w-full h-full flex flex-col items-center justify-center p-6">
+              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-white">
                 {idx === 0 ? (
-                   <div className="text-center">
-                     <h1 className="text-3xl font-bold text-white mb-2">WorkSpace</h1>
-                     <div className="px-4 py-2 bg-blue-600/10 border border-blue-500/20 rounded-full">
-                       <p className="text-blue-400 text-sm font-medium">Сессия: {user.displayName}</p>
-                     </div>
+                   <div className="text-center animate-in fade-in zoom-in duration-500">
+                     <h1 className="text-3xl font-bold mb-2">WorkSpace</h1>
+                     <p className="text-[#A594FD] opacity-80">Активная сессия: {user.displayName}</p>
                    </div>
                 ) : <NotFound />}
               </div>
