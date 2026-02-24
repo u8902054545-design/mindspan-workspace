@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindSpan Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        body { background-color: #0a0a0a; color: #ffffff; font-family: 'Inter', sans-serif; margin: 0; overflow-x: hidden; }
+        .header-container { background-color: #131314; border-bottom-left-radius: 28px; border-bottom-right-radius: 28px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); position: relative; z-index: 10; }
+        .status-pill { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(8px); padding: 4px 10px; border-radius: 100px; display: flex; align-items: center; gap: 6px; }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; position: relative; }
+        .status-dot::after { content: ''; position: absolute; inset: -2px; border-radius: 50%; opacity: 0.5; animation: pulse 2.5s infinite; }
+        .status-active { background-color: #10b981; }
+        .status-active::after { background-color: #10b981; }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 0.5; } 70% { transform: scale(2.8); opacity: 0; } 100% { transform: scale(1); opacity: 0; } }
+        .calendar-scroll { display: flex; overflow-x: auto; scroll-behavior: smooth; scrollbar-width: none; gap: 12px; padding: 4px 0; }
+        .calendar-scroll::-webkit-scrollbar { display: none; }
+        .day-card { min-width: 45px; height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; transition: all 0.2s ease; background: transparent; border: 2px solid transparent; }
+        .day-card.today { background-color: #0000FF; color: white; }
+        .day-card.selected { border-color: #0000FF; }
+        .day-name { font-size: 10px; text-transform: uppercase; font-weight: 600; opacity: 0.6; margin-bottom: 2px; }
+        .day-number { font-size: 16px; font-weight: 700; }
+        .m3-banner { background-color: #0000FF; border-radius: 28px; position: relative; overflow: hidden; display: flex; align-items: center; padding: 20px 24px; box-shadow: 0 10px 30px rgba(0, 0, 255, 0.25); max-width: 500px; margin: 8px auto 24px; }
+        .m3-banner-bg-icon { position: absolute; color: rgba(255, 255, 255, 0.1); font-size: 70px; pointer-events: none; }
+        .m3-icon-btn { width: 44px; height: 44px; border-radius: 50%; background-color: rgba(255, 255, 255, 0.15); display: flex; align-items: center; justify-content: center; color: white; }
+        .slots-container { width: 100%; max-width: 500px; margin: 0 auto; position: relative; }
+        .slot-group { background: #131314; border-radius: 24px; padding: 16px; margin-bottom: 16px; border: 1px solid rgba(255, 255, 255, 0.05); }
+        .slot-card { display: flex; align-items: center; padding: 12px; background: rgba(255, 255, 255, 0.03); border-radius: 16px; margin-bottom: 8px; }
+        .slot-icon-box { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-right: 12px; }
+        .icon-planned { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .icon-available { background: rgba(68, 68, 255, 0.1); color: #4444FF; }
+        .btn-schedule { background-color: #0000FF; color: white; font-size: 12px; font-weight: 600; padding: 8px 16px; border-radius: 12px; }
+        .spinner-wrapper { display: flex; justify-content: center; align-items: center; width: 100%; height: 200px; }
+        .spinner { width: 40px; height: 40px; animation: rotate 2s linear infinite; }
+        .spinner circle { fill: none; stroke: #4444FF; stroke-width: 4; stroke-linecap: round; animation: dash 1.5s ease-in-out infinite; }
+        @keyframes rotate { 100% { transform: rotate(360deg); } }
+        @keyframes dash { 0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; } 50% { stroke-dasharray: 90, 150; stroke-dashoffset: -35; } 100% { stroke-dasharray: 1, 150; stroke-dashoffset: -124; } }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; opacity: 0; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 200px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <header class="header-container w-full p-4 pb-6">
+        <div class="max-w-7xl mx-auto flex flex-col gap-4">
+            <div class="flex justify-between items-start">
+                <div class="status-pill">
+                    <span class="status-dot status-active"></span>
+                    <span class="text-[10px] font-medium text-gray-300">MindSpan Cloud</span>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <img id="userAvatar" src="" class="w-11 h-11 rounded-xl shadow-lg hidden" alt="Avatar">
+                <div id="avatarPlaceholder" class="w-11 h-11 rounded-xl bg-blue-700 flex items-center justify-center text-white font-bold text-sm">..</div>
+                <div class="flex flex-col">
+                    <h1 id="userName" class="text-base font-bold text-white leading-tight">Загрузка...</h1>
+                    <p id="userEmail" class="text-[11px] text-gray-500 font-medium">проверка сессии...</p>
+                </div>
+            </div>
+
+            <div class="mt-2">
+                <h2 class="text-sm font-semibold text-gray-300 mb-3 ml-1">Календарь слотов</h2>
+                <div id="calendar" class="calendar-scroll"></div>
+            </div>
+        </div>
+    </header>
+
+    <main class="p-4">
+        <section class="m3-banner w-full">
+            <span class="material-symbols-outlined m3-banner-bg-icon -top-2 -right-2" style="transform: rotate(15deg);">calendar_month</span>
+            <div class="relative z-10 flex-grow pr-4">
+                <h2 class="text-lg font-bold text-white leading-tight">Как начать работу</h2>
+                <p class="text-blue-100 text-[11px] opacity-80">Инструкции и регламент</p>
+            </div>
+            <button class="m3-icon-btn"><span class="material-symbols-outlined">arrow_forward</span></button>
+        </section>
+
+        <div id="slots-wrapper" class="slots-container"></div>
+    </main>
+
+    <script>
+        const config = {
+            apiKey: "AIzaSyCDYprLWHGhQM6jTjmepoqU_G2bFJHe6p4",
+            authDomain: "mindspan-workspace-5ff90.firebaseapp.com",
+            projectId: "mindspan-workspace-5ff90",
+            databaseURL: "https://mindspan-workspace-5ff90-default-rtdb.europe-west1.firebasedatabase.app"
+        };
+        firebase.initializeApp(config);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        // 1. Секьюрити-проверка
+        auth.onAuthStateChanged((user) => {
+            if (!user) {
+                window.top.location.href = 'index.html';
+            } else {
+                // Заполняем профиль
+                document.getElementById('userName').innerText = user.displayName;
+                document.getElementById('userEmail').innerText = user.email;
+                if(user.photoURL) {
+                    const img = document.getElementById('userAvatar');
+                    img.src = user.photoURL;
+                    img.classList.remove('hidden');
+                    document.getElementById('avatarPlaceholder').classList.add('hidden');
+                }
+
+                // Слушатель блокировки
+                const encodedEmail = user.email.replace(/\./g, ',');
+                const localToken = localStorage.getItem('ms_token');
+                db.ref('whitelist/' + encodedEmail).on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (!data || data.status !== 'active' || data.currentToken !== localToken) {
+                        window.top.location.href = 'index.html';
+                    }
+                });
+            }
+        });
+
+        // 2. Логика календаря и слотов (твоя база)
+        const slotsWrapper = document.getElementById('slots-wrapper');
+        const spinnerHTML = `<div class="spinner-wrapper"><div class="spinner"><svg viewBox="0 0 50 50"><circle cx="25" cy="25" r="20"></circle></svg></div></div>`;
+
+        function renderSlots(dayIndex) {
+            slotsWrapper.innerHTML = spinnerHTML;
+            setTimeout(() => {
+                slotsWrapper.classList.add('fade-in');
+                if (dayIndex % 2 === 0) {
+                    slotsWrapper.innerHTML = `
+                        <div class="slot-group"><div class="slot-card">
+                            <div class="slot-icon-box icon-planned"><span class="material-symbols-outlined">event_available</span></div>
+                            <div class="slot-info"><div class="slot-time">09:00 — 14:00</div><div class="slot-label">Утренняя смена</div></div>
+                        </div></div>`;
+                } else {
+                    slotsWrapper.innerHTML = `<div class="empty-state"><span class="material-symbols-outlined text-blue-600 text-5xl mb-2">calendar_today</span><p class="text-gray-500 text-sm">Нет доступных слотов</p></div>`;
+                }
+            }, 600);
+        }
+
+        function generateCalendar() {
+            const today = new Date();
+            const daysShort = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+            const container = document.getElementById('calendar');
+            renderSlots(0);
+
+            for (let i = 0; i < 14; i++) {
+                const date = new Date();
+                date.setDate(today.getDate() + i);
+                const card = document.createElement('div');
+                card.className = `day-card ${i === 0 ? 'today' : ''}`;
+                card.innerHTML = `<span class="day-name">${daysShort[date.getDay()]}</span><span class="day-number">${date.getDate()}</span>`;
+                card.onclick = () => {
+                    document.querySelectorAll('.day-card').forEach(c => c.classList.remove('selected', 'today'));
+                    card.classList.add('selected');
+                    renderSlots(i);
+                };
+                container.appendChild(card);
+            }
+        }
+        generateCalendar();
+    </script>
+</body>
+</html>

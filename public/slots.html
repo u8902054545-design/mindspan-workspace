@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Расписание слотов</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --md-sys-color-surface: #131314;
+            --md-sys-color-on-surface: #E3E3E3;
+            --md-sys-color-surface-container: #1C1C1E;
+            --md-sys-color-primary: #0000FF;
+            --md-sys-color-on-primary: #FFFFFF;
+            --md-sys-color-on-surface-variant: #C4C7C5;
+            --md-sys-color-divider: rgba(255, 255, 255, 0.1);
+            --spinner-primary: #a8c7fa;
+        }
+
+        body { background-color: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface); font-family: 'Roboto', sans-serif; margin: 0; display: flex; justify-content: center; overflow-x: hidden; }
+        .app-container { width: 100%; max-width: 400px; min-height: 100vh; display: flex; flex-direction: column; position: relative; }
+        .header-calendar { background-color: var(--md-sys-color-surface-container); padding: 24px 16px 32px 20px; border-bottom-left-radius: 32px; border-bottom-right-radius: 32px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); z-index: 10; }
+        .calendar-title { font-size: 26px; font-weight: 900; margin: 0; color: var(--md-sys-color-on-surface); letter-spacing: -0.5px; }
+        .instruction-text { font-size: 14px; font-weight: 500; color: var(--md-sys-color-on-surface-variant); margin-top: 4px; opacity: 0.9; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px 4px; text-align: center; }
+        .weekday { color: var(--md-sys-color-primary); font-size: 11px; font-weight: 700; height: 32px; display: flex; align-items: center; justify-content: center; }
+        .calendar-divider { grid-column: span 7; height: 1px; background-color: var(--md-sys-color-divider); margin: 0 0 8px 0; }
+        .month-display { font-size: 18px; color: var(--md-sys-color-on-surface); font-weight: 700; text-transform: capitalize; }
+        .nav-island { display: flex; align-items: center; background: rgba(255, 255, 255, 0.04); padding: 2px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(10px); }
+        .btn-nav { background: transparent; border: none; color: var(--md-sys-color-on-surface); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
+        .day-cell { height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; border-radius: 12px; font-size: 14px; font-weight: 500; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
+        .day-cell.inactive { color: #3c3c3c; cursor: default; }
+        .day-cell.today { background-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); font-weight: 700; }
+        .day-cell.selected:not(.today) { border: 2px solid var(--md-sys-color-primary); }
+        .day-cell.has-shift::after { content: ''; position: absolute; bottom: 6px; width: 12px; height: 2px; background-color: var(--md-sys-color-primary); border-radius: 2px; }
+        .bottom-sheet-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); z-index: 100; opacity: 0; visibility: hidden; transition: opacity 0.3s ease; }
+        .bottom-sheet-backdrop.active { opacity: 1; visibility: visible; }
+        .bottom-sheet { position: fixed; bottom: 0; left: 50%; transform: translate(-50%, 100%); width: 100%; max-width: 400px; background-color: var(--md-sys-color-surface-container); border-top-left-radius: 28px; border-top-right-radius: 28px; z-index: 101; padding: 12px 20px 32px 20px; transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1); box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5); }
+        .bottom-sheet.active { transform: translate(-50%, 0); }
+        .bottom-sheet-handle { width: 32px; height: 4px; background-color: var(--md-sys-color-on-surface-variant); border-radius: 2px; margin: 0 auto 20px auto; opacity: 0.4; }
+        .slot-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .slot-time { font-weight: 700; font-size: 16px; }
+        .slot-action { font-size: 12px; font-weight: 700; padding: 8px 16px; border-radius: 12px; background: var(--md-sys-color-primary); color: white; }
+        .spinner { width: 42px; height: 42px; animation: rotate 2.4s linear infinite; }
+        @keyframes rotate { 100% { transform: rotate(360deg); } }
+        .spinner circle { fill: none; stroke: var(--spinner-primary); stroke-width: 4.5; stroke-linecap: round; animation: dash 1.8s ease-in-out infinite; }
+        @keyframes dash { 0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; } 50% { stroke-dasharray: 100, 150; stroke-dashoffset: -15; } 100% { stroke-dasharray: 1, 150; stroke-dashoffset: -125; } }
+        .hidden-content { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header-calendar">
+        <div class="header-titles mb-6">
+            <h1 class="calendar-title">Выберите день</h1>
+            <p class="instruction-text">Затем, выберите удобное время смены</p>
+        </div>
+        <div class="calendar-grid" id="calendarGrid">
+            <div class="weekday">Пн</div><div class="weekday">Вт</div><div class="weekday">Ср</div><div class="weekday">Чт</div><div class="weekday">Пт</div><div class="weekday">Сб</div><div class="weekday">Вс</div>
+            <div class="calendar-divider"></div>
+            <div class="month-nav-row col-span-7 flex justify-between items-center mb-4">
+                <span id="currentMonthYear" class="month-display"></span>
+                <div class="nav-island">
+                    <button class="btn-nav" onclick="changeMonth(-1)"><svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
+                    <div class="w-px h-4 bg-white/10 mx-1"></div>
+                    <button class="btn-nav" onclick="changeMonth(1)"><svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-sheet-backdrop" id="sheetBackdrop" onclick="closeBottomSheet()"></div>
+    <div class="bottom-sheet" id="bottomSheet">
+        <div class="bottom-sheet-handle"></div>
+        <div id="loader-wrapper" class="hidden flex-col items-center py-10">
+            <div class="spinner"><svg viewBox="0 0 50 50"><circle cx="25" cy="25" r="20"></circle></svg></div>
+        </div>
+        <div id="sheetContent">
+            <h2 class="text-xl font-bold mb-1" id="sheetTitle">Смены</h2>
+            <p class="text-sm text-gray-400 mb-6">Управление вашим расписанием</p>
+            <div id="availableSlots"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const config = {
+        apiKey: "AIzaSyCDYprLWHGhQM6jTjmepoqU_G2bFJHe6p4",
+        authDomain: "mindspan-workspace-5ff90.firebaseapp.com",
+        projectId: "mindspan-workspace-5ff90",
+        databaseURL: "https://mindspan-workspace-5ff90-default-rtdb.europe-west1.firebasedatabase.app"
+    };
+    firebase.initializeApp(config);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    // Защита доступа
+    auth.onAuthStateChanged((user) => {
+        if (!user) {
+            window.top.location.href = 'index.html';
+        } else {
+            const encodedEmail = user.email.replace(/\./g, ',');
+            const localToken = localStorage.getItem('ms_token');
+            db.ref('whitelist/' + encodedEmail).on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (!data || data.status !== 'active' || data.currentToken !== localToken) {
+                    window.top.location.href = 'index.html';
+                }
+            });
+        }
+    });
+
+    let currentViewDate = new Date();
+    const today = new Date(); today.setHours(0,0,0,0);
+    const monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+
+    function renderCalendar() {
+        const grid = document.getElementById('calendarGrid');
+        const monthLabel = document.getElementById('currentMonthYear');
+        while (grid.children.length > 9) grid.removeChild(grid.lastChild);
+        
+        monthLabel.innerText = `${monthNames[currentViewDate.getMonth()]} ${currentViewDate.getFullYear()}`;
+        
+        const firstDay = new Date(currentViewDate.getFullYear(), currentViewDate.getMonth(), 1);
+        let startDay = firstDay.getDay(); startDay = startDay === 0 ? 6 : startDay - 1;
+        for (let i = 0; i < startDay; i++) grid.appendChild(document.createElement('div'));
+
+        const daysInMonth = new Date(currentViewDate.getFullYear(), currentViewDate.getMonth() + 1, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateObj = new Date(currentViewDate.getFullYear(), currentViewDate.getMonth(), d);
+            const cell = document.createElement('div');
+            cell.className = 'day-cell';
+            cell.innerText = d;
+            if (dateObj.getTime() === today.getTime()) cell.classList.add('today');
+            if (dateObj >= today && dateObj <= new Date(today.getTime() + 13*24*60*60*1000)) {
+                cell.onclick = () => openBottomSheet(dateObj);
+            } else {
+                cell.classList.add('inactive');
+            }
+            grid.appendChild(cell);
+        }
+    }
+
+    function openBottomSheet(date) {
+        document.getElementById('sheetBackdrop').classList.add('active');
+        document.getElementById('bottomSheet').classList.add('active');
+        const loader = document.getElementById('loader-wrapper');
+        const content = document.getElementById('sheetContent');
+        
+        loader.classList.remove('hidden');
+        loader.classList.add('flex');
+        content.classList.add('hidden-content');
+
+        setTimeout(() => {
+            document.getElementById('sheetTitle').innerText = date.toLocaleDateString('ru-RU', {day:'numeric', month:'long'});
+            document.getElementById('availableSlots').innerHTML = `
+                <div class="slot-card">
+                    <div><div class="slot-time">10:00 - 14:00</div><div class="text-xs text-gray-500">Разработчик MindSpan</div></div>
+                    <div class="slot-action" onclick="closeBottomSheet()">Записать</div>
+                </div>`;
+            loader.classList.add('hidden');
+            loader.classList.remove('flex');
+            content.classList.remove('hidden-content');
+        }, 1000);
+    }
+
+    function closeBottomSheet() {
+        document.getElementById('bottomSheet').classList.remove('active');
+        document.getElementById('sheetBackdrop').classList.remove('active');
+    }
+
+    function changeMonth(dir) { currentViewDate.setMonth(currentViewDate.getMonth() + dir); renderCalendar(); }
+    window.onload = renderCalendar;
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "whitelist": {
+      ".read": "auth != null",
+      "$encodedEmail": {
+        ".write": "auth != null && auth.token.email.replace('.', ',') == $encodedEmail"
+      }
+    }
+  }
+}

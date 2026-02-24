@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Material 3 Navigation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0F0F0F; min-height: 100vh; margin: 0; overflow: hidden; -webkit-user-select: none; user-select: none; }
+        .sections-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: calc(100% - 80px); overflow: hidden; z-index: 10; }
+        .section { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: transform 0.4s cubic-bezier(0.4, 0.0, 0.2, 1); will-change: transform; background-color: #0F0F0F; }
+        .content-frame { width: 100%; height: 100%; border: none; background-color: transparent; }
+        .nav-bar { background-color: #1F1F1F; border-top: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6); height: 80px; padding-bottom: env(safe-area-inset-bottom); }
+        .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none; outline: none; -webkit-tap-highlight-color: transparent; }
+        .icon-container { display: flex; align-items: center; justify-content: center; width: 64px; height: 32px; border-radius: 16px; transition: background-color 0.3s cubic-bezier(0.2, 0.0, 0, 1.0), color 0.3s ease; margin-bottom: 4px; }
+        .nav-label { font-size: 11px; font-weight: 600; color: #C4C7C5; transition: color 0.2s; letter-spacing: 0.3px; }
+        .nav-item svg { color: #C4C7C5; transition: color 0.2s; width: 24px; height: 24px; }
+        .nav-item.active .icon-container { background-color: #0000FF; }
+        .nav-item.active svg { color: #FFFFFF; }
+        .nav-item.active .nav-label { color: #FFFFFF; }
+    </style>
+</head>
+<body>
+    <div id="authLoader" class="fixed inset-0 bg-[#0F0F0F] z-[9999] flex items-center justify-center transition-opacity duration-500">
+        <div class="w-12 h-12 border-4 border-[#0000FF] border-t-transparent rounded-full animate-spin"></div>
+    </div>
+
+    <div class="sections-wrapper" id="sectionsContainer">
+        <div class="section" data-index="0" style="transform: translateX(0);"><iframe data-src="main.html" class="content-frame"></iframe></div>
+        <div class="section" data-index="1" style="transform: translateX(100%);"><iframe data-src="slots.html" class="content-frame"></iframe></div>
+        <div class="section" data-index="2" style="transform: translateX(100%);"><iframe data-src="404.html" class="content-frame"></iframe></div>
+        <div class="section" data-index="3" style="transform: translateX(100%);"><iframe data-src="404.html" class="content-frame"></iframe></div>
+        <div class="section" data-index="4" style="transform: translateX(100%);"><iframe data-src="404.html" class="content-frame"></iframe></div>
+        <div class="section" data-index="5" style="transform: translateX(100%);"><iframe data-src="404.html" class="content-frame"></iframe></div>
+    </div>
+
+    <nav class="nav-bar fixed bottom-0 left-0 w-full z-50">
+        <div class="flex justify-between items-center h-full max-w-lg mx-auto px-2">
+            <button id="homeBtn" class="nav-item active" onclick="setActive(this, 0)">
+                <div class="icon-container"><i data-lucide="home"></i></div>
+                <span class="nav-label">Главный</span>
+            </button>
+            <button class="nav-item" onclick="setActive(this, 1)">
+                <div class="icon-container"><i data-lucide="calendar-range"></i></div>
+                <span class="nav-label">Слоты</span>
+            </button>
+            <button class="nav-item" onclick="setActive(this, 2)">
+                <div class="icon-container"><i data-lucide="folder-open"></i></div>
+                <span class="nav-label">Файлы</span>
+            </button>
+            <button class="nav-item" onclick="setActive(this, 3)">
+                <div class="icon-container"><i data-lucide="credit-card"></i></div>
+                <span class="nav-label">Выплаты</span>
+            </button>
+            <button class="nav-item" onclick="setActive(this, 4)">
+                <div class="icon-container"><i data-lucide="graduation-cap"></i></div>
+                <span class="nav-label">Обучение</span>
+            </button>
+            <button class="nav-item" onclick="setActive(this, 5)">
+                <div class="icon-container"><i data-lucide="message-square-more"></i></div>
+                <span class="nav-label">Чаты</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        const config = {
+            apiKey: "AIzaSyCDYprLWHGhQM6jTjmepoqU_G2bFJHe6p4",
+            authDomain: "mindspan-workspace-5ff90.firebaseapp.com",
+            projectId: "mindspan-workspace-5ff90",
+            databaseURL: "https://mindspan-workspace-5ff90-default-rtdb.europe-west1.firebasedatabase.app"
+        };
+        firebase.initializeApp(config);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        auth.onAuthStateChanged((user) => {
+            if (!user) { window.top.location.href = 'index.html'; }
+            else {
+                const encodedEmail = user.email.replace(/\./g, ',');
+                const localToken = localStorage.getItem('ms_token');
+                db.ref('whitelist/' + encodedEmail).on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (!data || data.status !== 'active' || data.currentToken !== localToken) {
+                        window.top.location.href = 'index.html';
+                    } else {
+                        const loader = document.getElementById('authLoader');
+                        if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.style.display = 'none', 500); }
+                        loadIframeContent(0);
+                    }
+                });
+            }
+        });
+
+        lucide.createIcons();
+        let currentIndex = 0;
+        const sections = document.querySelectorAll('.section');
+        const cacheBuster = Date.now();
+
+        function loadIframeContent(index) {
+            const iframe = sections[index].querySelector('iframe');
+            if (iframe && iframe.dataset.src) {
+                iframe.src = `${iframe.dataset.src}?v=${cacheBuster}`;
+                delete iframe.dataset.src;
+            }
+        }
+
+        function setActive(element, targetIndex) {
+            if (currentIndex === targetIndex) return;
+            loadIframeContent(targetIndex);
+            const direction = targetIndex > currentIndex ? 1 : -1;
+            sections[currentIndex].style.transform = `translateX(${-100 * direction}%)`;
+            sections[targetIndex].style.transition = 'none';
+            sections[targetIndex].style.transform = `translateX(${100 * direction}%)`;
+            void sections[targetIndex].offsetWidth;
+            sections[targetIndex].style.transition = 'transform 0.4s cubic-bezier(0.4, 0.0, 0.2, 1)';
+            sections[targetIndex].style.transform = 'translateX(0)';
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            element.classList.add('active');
+            if (navigator.vibrate) navigator.vibrate(8);
+            currentIndex = targetIndex;
+        }
+
+        // Ключевое исправление: слушаем сигнал от 404.html
+        window.addEventListener("message", (event) => {
+            if (event.data === "goToHome") {
+                const homeBtn = document.getElementById('homeBtn');
+                if (homeBtn) setActive(homeBtn, 0);
+            }
+        });
+    </script>
+</body>
+</html>
